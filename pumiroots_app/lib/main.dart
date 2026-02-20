@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'services/api_service.dart';
 
 void main() {
-  runApp(MaterialApp(home: LoginScreen()));
+  runApp(MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: LoginScreen(),
+  ));
 }
 
 class LoginScreen extends StatefulWidget {
@@ -11,12 +14,12 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   final TextEditingController userCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
 
   String message = "";
   String? token;
+  bool isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -36,36 +39,43 @@ class _LoginScreenState extends State<LoginScreen> {
               obscureText: true,
             ),
             SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () async {
+            isLoading
+                ? CircularProgressIndicator()
+                : ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        isLoading = true;
+                      });
 
-                token = await ApiService.login(
-                  userCtrl.text,
-                  passCtrl.text,
-                );
+                      token = await ApiService.login(
+                        userCtrl.text,
+                        passCtrl.text,
+                      );
 
-                if (token != null) {
-                  setState(() {
-                    message = "Login Successful!";
-                  });
+                      setState(() {
+                        isLoading = false;
+                      });
 
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ProductScreen(token: token!),
-                    ),
-                  );
-
-                } else {
-                  setState(() {
-                    message = "Login Failed";
-                  });
-                }
-              },
-              child: Text("Login"),
-            ),
+                      if (token != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ProductScreen(token: token!),
+                          ),
+                        );
+                      } else {
+                        setState(() {
+                          message = "Login Failed";
+                        });
+                      }
+                    },
+                    child: Text("Login"),
+                  ),
             SizedBox(height: 20),
-            Text(message),
+            Text(
+              message,
+              style: TextStyle(color: Colors.red),
+            ),
           ],
         ),
       ),
@@ -83,8 +93,8 @@ class ProductScreen extends StatefulWidget {
 }
 
 class _ProductScreenState extends State<ProductScreen> {
-
   List<dynamic> products = [];
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -94,8 +104,10 @@ class _ProductScreenState extends State<ProductScreen> {
 
   void loadProducts() async {
     final data = await ApiService.getProducts(widget.token);
+
     setState(() {
       products = data;
+      isLoading = false;
     });
   }
 
@@ -103,18 +115,38 @@ class _ProductScreenState extends State<ProductScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text("Products")),
-      body: ListView.builder(
-        itemCount: products.length,
-        itemBuilder: (context, index) {
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: products.length,
+              itemBuilder: (context, index) {
+                final product = products[index];
 
-          final product = products[index];
-
-          return ListTile(
-            title: Text(product['name']),
-            subtitle: Text(product['price']),
-          );
-        },
-      ),
+                return Card(
+                  margin: EdgeInsets.all(10),
+                  elevation: 3,
+                  child: ListTile(
+                    leading: Image.network(
+                      product['images'] != null &&
+                              product['images'].isNotEmpty
+                          ? product['images'][0]['src']
+                          : 'https://via.placeholder.com/150',
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                    ),
+                    title: Text(
+                      product['name'] ?? "No Name",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      "₹ ${product['price'] ?? "0"}",
+                      style: TextStyle(color: Colors.green),
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
